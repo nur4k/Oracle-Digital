@@ -1,0 +1,70 @@
+version: '3.9'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+    - published: 5432
+      target: 5432
+      mode: host
+    env_file:
+      - ./.env
+    restart: always
+    depends_on:
+      - database
+    networks:
+      - stack
+  
+
+  database:
+    image: postgres:15-alpine
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: always
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    networks:
+      - stack
+  
+  migrations:
+    restart: "no"
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: "sh -c 'python3 manage.py migrate'"
+    env_file:
+      - ./.env
+    depends_on:
+      - database
+      - backend
+    networks:
+      - stack
+  
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      - stack
+    depends_on: [ redis, database, backend, migrations ]
+    entrypoint: "celery -A core worker -l info"
+    env_file:
+      - .env
+    
+  redis:
+    image: redis/redis-stack-server:latest
+    networks:
+      - stack
+
+
+volumes:
+  postgres-data:
+networks:
+  stack:
+
+
+
+
+    
